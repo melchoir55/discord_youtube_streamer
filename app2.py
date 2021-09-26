@@ -1,5 +1,5 @@
-#WaLLE
 import asyncio
+import collections
 import discord
 from discord.ext import commands,tasks
 import os
@@ -30,7 +30,7 @@ ytdl_format_options = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+    'source_address': '0.0.0.0', # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
 ffmpeg_options = {
@@ -38,6 +38,14 @@ ffmpeg_options = {
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+playlist = collections.deque()
+playhist = collections.deque()
+
+
+class Track:
+    def __init__(self, filename, url):
+        self.filename = filename
+        self.url = url
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -55,27 +63,66 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)       
         return filename
 
+playingtrack = False
 
-@bot.command(name='play_song', help='To play song')
-async def play(ctx,url):
+@bot.command(name='play', help='To play song')
+async def play(ctx,url = None):
+    global playhist
+    if url == None:
+        if playlist:
+            track = playlist.pop()
+            playhist.append(track)
+            url = track.url
+        else:
+            await ctx.send('Nothing to play')
+            return
     try :
-        server = ctx.message.guild
-        voice_channel = server.voice_client
-        voice_channel.stop()
-
+        global playingtrack
+        await join(ctx)
+        voice_client = ctx.message.guild.voice_client
+        if playingtrack:
+            voice_client.stop()       
         async with ctx.typing():
-            filename = await YTDLSource.from_url(url, loop=bot.loop)
+            filename = await YTDLSource.from_url(url, loop=bot.loop)           
+            playlist.appendleft(Track(filename, url))
             song = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=filename)
-            voice_channel.play(song)
+            voice_client.play(song)
+            playingtrack = True        
         await ctx.send('**Playing**')
+                
     except:        
         await ctx.send("The bot is not connected to a voice channel.")
 
+
+@bot.command(name = 'add', help='Adds a track to the queue')
+async def add(ctx, url):
+    try:
+         async with ctx.typing():
+            filename = await YTDLSource.from_url(url, loop=bot.loop)
+            playlist.appendleft(Track(filename, url))
+         await ctx.send("Added song to queue. Count: " + len(playlist).__str__())
+         for track in playlist:
+            await ctx.send(track.url)         
+    except:
+        await ctx.send("Some error occurred while accessing ytdl")
+
+@bot.command(name = 'next', help = '')
+async def next(ctx):
+    await play(ctx)
+
+@bot.command(name='prev', help = '')
+async def prev(ctx):
+    global playlist
+    track = playhist.pop()
+    playlist.appendleft(track)
+    await play(ctx)
 
 @bot.command(name='join', help='Tells the bot to join the voice channel')
 async def join(ctx):
     if not ctx.message.author.voice:
         await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
+        return
+    if ctx.message.guild.voice_client:
         return
     else:
         channel = ctx.message.author.voice.channel
@@ -111,11 +158,12 @@ async def leave(ctx):
 @bot.command(name='stop', help='Stops the song')
 async def stop(ctx):
     voice_client = ctx.message.guild.voice_client
+    global playingtrack
     if voice_client.is_playing():
         voice_client.stop()
+        playingtrack = False     
     else:
         await ctx.send("The bot is not playing anything at the moment.")
-
 
 @bot.event
 async def on_ready():
@@ -167,14 +215,7 @@ async def on_member_join(member):
              if member.is_on_mobile() == True :
                  on_mobile = True
              await channel.send("Welcome to the Server {}!!\n On Mobile : {}".format(member.name,on_mobile))             
-        
-# TODO : Filter out swear words from messages
-
-@bot.command()
-async def tell_me_about_yourself(ctx):
-    text = "My name is WallE!\n I was built by Kakarot2000. At present I have limited features(find out more by typing !help)\n :)"
-    await ctx.send(text)
-
+ 
 @bot.event
 async def on_message(message) :
     # bot.process_commands(msg) is a couroutine that must be called here since we are overriding the on_message event
