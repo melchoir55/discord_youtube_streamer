@@ -1,4 +1,5 @@
 #WaLLE
+import asyncio
 import discord
 from discord.ext import commands,tasks
 import os
@@ -9,6 +10,8 @@ import youtube_dl
 load_dotenv()
 # Get the API token from the .env file.
 DISCORD_TOKEN = os.getenv("discord_token")
+
+print(DISCORD_TOKEN)
 
 intents = discord.Intents().all()
 client = discord.Client(intents=intents)
@@ -41,34 +44,31 @@ class YTDLSource(discord.PCMVolumeTransformer):
         super().__init__(source, volume)
         self.data = data
         self.title = data.get('title')
-        self.url = ""
 
     @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
+    async def from_url(cls, url, *, loop=None, stream=True):
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
         if 'entries' in data:
             # take first item from a playlist
-            data = data['entries'][0]
-        filename = data['title'] if stream else ytdl.prepare_filename(data)
+            data = data['entries'][0]     
+        filename = data['url'] if stream else ytdl.prepare_filename(data)       
         return filename
 
 
 @bot.command(name='play_song', help='To play song')
 async def play(ctx,url):
-    
-    if not ctx.message.author.name=="Rohan Krishna" :
-         await ctx.send('NOT AUTHORISED!')
-         return
     try :
         server = ctx.message.guild
         voice_channel = server.voice_client
+        voice_channel.stop()
 
         async with ctx.typing():
             filename = await YTDLSource.from_url(url, loop=bot.loop)
-            voice_channel.play(discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=filename))
-        await ctx.send('**Now playing:** {}'.format(filename))
-    except:
+            song = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=filename)
+            voice_channel.play(song)
+        await ctx.send('**Playing**')
+    except:        
         await ctx.send("The bot is not connected to a voice channel.")
 
 
@@ -86,7 +86,7 @@ async def join(ctx):
 async def pause(ctx):
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
-        await voice_client.pause()
+        voice_client.pause()
     else:
         await ctx.send("The bot is not playing anything at the moment.")
     
@@ -94,7 +94,7 @@ async def pause(ctx):
 async def resume(ctx):
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_paused():
-        await voice_client.resume()
+        voice_client.resume()
     else:
         await ctx.send("The bot was not playing anything before this. Use play_song command")
     
@@ -112,7 +112,7 @@ async def leave(ctx):
 async def stop(ctx):
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
-        await voice_client.stop()
+        voice_client.stop()
     else:
         await ctx.send("The bot is not playing anything at the moment.")
 
@@ -124,7 +124,6 @@ async def on_ready():
         for channel in guild.text_channels :
             if str(channel) == "general" :
                 await channel.send('Bot Activated..')
-                await channel.send(file=discord.File('giphy.png'))
         print('Active in {}\n Member Count : {}'.format(guild.name,guild.member_count))
 
 @bot.command(help = "Prints details of Author")
