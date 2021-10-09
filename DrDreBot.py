@@ -1,8 +1,11 @@
 import asyncio
 import collections
+from logging import error
+from time import sleep
 import discord
 from discord.ext import commands,tasks
 import os
+from discord.ext.commands.bot import Bot
 from dotenv import load_dotenv
 import youtube_dl
 
@@ -40,7 +43,11 @@ ffmpeg_options = {
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 playlist = collections.deque()
 playhist = collections.deque()
-
+currentVoiceClient = None
+currentVoiceChannel = None
+currentSongData = None
+guildTextChannel = None
+currentTrack = None
 
 class Track:
     def __init__(self, filename, url):
@@ -54,24 +61,48 @@ class YTDLSource(discord.PCMVolumeTransformer):
         self.title = data.get('title')
 
     @classmethod
-    async def from_url(cls, url, *, loop=None, stream=True):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+    async def from_url(cls, url, *, loops=None, stream=True):
+        loop = None
+        if loops is None:
+            loop = asyncio.get_event_loop()  
+        else:
+            loop = loops            
+        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
         if 'entries' in data:
             # take first item from a playlist
-            data = data['entries'][0]     
-        filename = data['url'] if stream else ytdl.prepare_filename(data)       
-        return filename
+            data = data['entries'][0]    
+
+        fileName = data['artist'] + ' - ' + data['title'] 
+        if not fileName:
+            fileName = ytdl.prepare_filename(data)
+        url = data['url']    
+        time = data['duration']
+        #return url, fileName, time
+        return data
+
+def get_or_create_event_loop():
+    try:
+        loop = asyncio.get_event_loop()        
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
 
 playingtrack = False
 
 @bot.command(name='play', help='To play song')
 async def play(ctx,url = None):
     global playhist
+    global currentVoiceClient
+    global currentVoiceChannel
+    global guildTextChannel
+    global currentTrack
+    
     if url == None:
         if playlist:
+            playhist.append(currentTrack)
             track = playlist.pop()
-            playhist.append(track)
+            currentTrack = track
             url = track.url
         else:
             await ctx.send('Nothing to play')
@@ -79,46 +110,85 @@ async def play(ctx,url = None):
     try :
         global playingtrack
         await join(ctx)
-        voice_client = ctx.message.guild.voice_client
-        if playingtrack:
-            voice_client.stop()       
-        async with ctx.typing():
-            filename = await YTDLSource.from_url(url, loop=bot.loop)           
-            playlist.appendleft(Track(filename, url))
-            song = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=filename)
-            voice_client.play(song)
-            playingtrack = True        
-        await ctx.send('**Playing**')
+        if ctx is not None and ctx.message.guild.voice_client is not None and ctx.message.guild.voice_channels[0] is not None:
+            currentVoiceClient = ctx.message.guild.voice_client
+            currentVoiceChannel = ctx.message.guild.voice_channels[0]
+            guildTextChannel = ctx.message.guild.text_channels[0] 
+        
+        await download_song(url)
+
                 
     except:        
         await ctx.send("The bot is not connected to a voice channel.")
 
+async def download_song(url):
+    global currentTrack
+    fileData = await YTDLSource.from_url(url, loops=bot.loop)  
+    fileName = fileData['artist'] + ' - ' + fileData['title']
+    duration = fileData['duration']
+    currentTrack = Track(fileName, url)
+    song = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=fileData['url'], before_options="-re")            
+    playingtrack = True 
+    await guildTextChannel.send('Playing **' + fileName + '**')
+    await start_playing(song, duration)
+    return fileData
+
+async def start_playing(song, duration):
+    currentVoiceClient.stop()      
+    currentVoiceClient.play(song)
+    await asyncio.sleep(duration)
+    playNext(None)
 
 @bot.command(name = 'add', help='Adds a track to the queue')
 async def add(ctx, url):
     try:
          async with ctx.typing():
-            filename = await YTDLSource.from_url(url, loop=bot.loop)
-            playlist.appendleft(Track(filename, url))
-         await ctx.send("Added song to queue. Count: " + len(playlist).__str__())
-         for track in playlist:
-            await ctx.send(track.url)         
+            fileData = await YTDLSource.from_url(url, loops=bot.loop)
+            playlist.appendleft(Track(fileData['artist'] + ' - ' + fileData['title'], url))
+            await queue(ctx)
     except:
         await ctx.send("Some error occurred while accessing ytdl")
+
+@bot.command(name='queue', help = 'Prints queue and previous songs')
+async def queue(ctx):
+        s = ""
+        s += "Playing : **" + currentTrack.filename + "** \n"
+        s += "-------------In Queue-------------\n"
+        #Reversed for songs to upper in order: next song on toppy    
+        for track in reversed(playlist):
+            s += track.filename + "\n"   
+        s += "-------------Previous-------------\n"
+        for track in playhist:
+            s += track.filename + "\n"  
+        await ctx.send(s)
 
 @bot.command(name = 'next', help = '')
 async def next(ctx):
     await play(ctx)
+
+
+def playNext(error):
+    global playhist
+    global playlist
+    global currentVoiceClient
+    global currentVoiceChannel
+    if playlist:
+            playhist.append(currentTrack)
+            track = playlist.pop()
+            loop = asyncio.get_event_loop()
+            loop.create_task(download_song(track.url))
 
 @bot.command(name='prev', help = '')
 async def prev(ctx):
     global playlist
     track = playhist.pop()
     playlist.appendleft(track)
-    await play(ctx)
+    await download_song(track.url)
 
 @bot.command(name='join', help='Tells the bot to join the voice channel')
 async def join(ctx):
+    if ctx == None:
+        return
     if not ctx.message.author.voice:
         await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
         return
@@ -151,6 +221,8 @@ async def resume(ctx):
 async def leave(ctx):
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_connected():
+        playlist.clear()
+        playhist.clear()
         await voice_client.disconnect()
     else:
         await ctx.send("The bot is not connected to a voice channel.")
@@ -174,57 +246,16 @@ async def on_ready():
                 await channel.send('Bot Activated..')
         print('Active in {}\n Member Count : {}'.format(guild.name,guild.member_count))
 
-@bot.command(help = "Prints details of Author")
-async def whats_my_name(ctx) :
-    await ctx.send('Hello {}'.format(ctx.author.name))
-
-@bot.command(help = "Prints details of Server")
-async def where_am_i(ctx):
-    owner=str(ctx.guild.owner)
-    region = str(ctx.guild.region)
-    guild_id = str(ctx.guild.id)
-    memberCount = str(ctx.guild.member_count)
-    icon = str(ctx.guild.icon_url)
-    desc=ctx.guild.description
-    
-    embed = discord.Embed(
-        title=ctx.guild.name + " Server Information",
-        description=desc,
-        color=discord.Color.blue()
-    )
-    embed.set_thumbnail(url=icon)
-    embed.add_field(name="Owner", value=owner, inline=True)
-    embed.add_field(name="Server ID", value=guild_id, inline=True)
-    embed.add_field(name="Region", value=region, inline=True)
-    embed.add_field(name="Member Count", value=memberCount, inline=True)
-
-    await ctx.send(embed=embed)
-
-    members=[]
-    async for member in ctx.guild.fetch_members(limit=150) :
-        await ctx.send('Name : {}\t Status : {}\n Joined at {}'.format(member.display_name,str(member.status),str(member.joined_at)))
-
-    
-
-
 @bot.event
-async def on_member_join(member):
-     for channel in member.guild.text_channels :
-         if str(channel) == "general" :
-             on_mobile=False
-             if member.is_on_mobile() == True :
-                 on_mobile = True
-             await channel.send("Welcome to the Server {}!!\n On Mobile : {}".format(member.name,on_mobile))             
+async def on_voice_state_update(member, before, after):
+    if member.name == "DrDreBot":
+        if before.channel is None and after.channel is not None:
+            await member.guild.text_channels[0].send("Lets Jam!")        
  
 @bot.event
 async def on_message(message) :
     # bot.process_commands(msg) is a couroutine that must be called here since we are overriding the on_message event
-    await bot.process_commands(message) 
-    if str(message.content).lower() == "hello":
-        await message.channel.send('Hi!')
-    
-    if str(message.content).lower() in ['swear_word1','swear_word2']:
-        await message.channel.purge(limit=1)
+    await bot.process_commands(message)
 
 
 if __name__ == "__main__" :
