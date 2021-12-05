@@ -36,9 +36,7 @@ ytdl_format_options = {
     'source_address': '0.0.0.0', # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
-ffmpeg_options = {
-    'options': '-vn'
-}
+
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 playlist = collections.deque()
@@ -69,14 +67,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
             loop = loops            
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
         if 'entries' in data:
-            # take first item from a playlist
-            data = data['entries'][0]    
-
-        fileName = data['artist'] + ' - ' + data['title'] 
-        if not fileName:
-            fileName = ytdl.prepare_filename(data)
-        url = data['url']    
-        time = data['duration']
+            data = data['entries']   
         #return url, fileName, time
         return data
 
@@ -97,10 +88,11 @@ async def play(ctx,url = None):
     global currentVoiceChannel
     global guildTextChannel
     global currentTrack
-    
+
+    if currentTrack:
+        playhist.append(currentTrack)    
     if url == None:
         if playlist:
-            playhist.append(currentTrack)
             track = playlist.pop()
             currentTrack = track
             url = track.url
@@ -123,14 +115,25 @@ async def play(ctx,url = None):
 
 async def download_song(url):
     global currentTrack
-    fileData = await YTDLSource.from_url(url, loops=bot.loop)  
-    fileName = fileData['artist'] + ' - ' + fileData['title']
-    duration = fileData['duration']
-    currentTrack = Track(fileName, url)
-    song = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=fileData['url'], before_options="-re")            
-    playingtrack = True 
-    await guildTextChannel.send('Playing **' + fileName + '**')
-    await start_playing(song, duration)
+    global playingtrack
+    fileData = await YTDLSource.from_url(url, loops=bot.loop)
+    if type(fileData) is list:                    
+            fileName = fileData[0]['artist'] + ' - ' + fileData[0]['title']
+            duration = fileData[0]['duration']
+            currentTrack = Track(fileName,  fileData[0]['webpage_url'])
+            song = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=fileData[0]['url'], before_options="-re -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5")            
+            playingtrack = True     
+            await guildTextChannel.send('Playing **' + fileName + '**')
+            await add(fileData)
+            await start_playing(song, duration)
+    else: 
+         fileName = fileData['artist'] + ' - ' + fileData['title']
+         duration = fileData['duration']
+         currentTrack = Track(fileName,  fileData['webpage_url'])
+         song = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=fileData['url'], before_options="-re -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5")
+         playingtrack = True     
+         await guildTextChannel.send('Playing **' + fileName + '**')
+         await start_playing(song, duration)            
     return fileData
 
 async def start_playing(song, duration):
@@ -141,25 +144,41 @@ async def start_playing(song, duration):
 
 @bot.command(name = 'add', help='Adds a track to the queue')
 async def add(ctx, url):
+    global currentTrack
     try:
          async with ctx.typing():
-            fileData = await YTDLSource.from_url(url, loops=bot.loop)
-            playlist.appendleft(Track(fileData['artist'] + ' - ' + fileData['title'], url))
+            fileData = await YTDLSource.from_url(url, loops=bot.loop)           
+            
+            if type(fileData) is list:
+                currentTrack = fileData[0]
+                for song in fileData[1:]:
+                    playlist.appendleft(Track(song['artist'] + ' - ' + song['title'], song['webpage_url']))
+
+            else:
+                playlist.appendleft(Track(fileData['artist'] + ' - ' + fileData['title'], fileData['webpage_url']))
+
             await queue(ctx)
     except:
         await ctx.send("Some error occurred while accessing ytdl")
 
+async def add(data):
+    for song in data[1:]:
+          playlist.appendleft(Track(song['artist'] + ' - ' + song['title'], song['webpage_url']))
+          #await queue(ctx)
+
 @bot.command(name='queue', help = 'Prints queue and previous songs')
 async def queue(ctx):
         s = ""
-        s += "Playing : **" + currentTrack.filename + "** \n"
+        if playingtrack is True:
+            s += "Playing : **" + currentTrack.filename + "** \n"
         s += "-------------In Queue-------------\n"
         #Reversed for songs to upper in order: next song on toppy    
         for track in reversed(playlist):
             s += track.filename + "\n"   
         s += "-------------Previous-------------\n"
-        for track in playhist:
-            s += track.filename + "\n"  
+        if playhist is any:
+            for track in playhist:
+                s += track.filename + "\n"  
         await ctx.send(s)
 
 @bot.command(name = 'next', help = '')
