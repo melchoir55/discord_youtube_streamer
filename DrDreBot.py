@@ -4,7 +4,6 @@ import os
 
 import discord
 import nest_asyncio
-import youtube_dl
 from discord.ext import commands
 from dotenv import load_dotenv
 
@@ -29,7 +28,7 @@ currentVoiceChannel = None
 currentSongData = None
 guildTextChannel = None
 currentTrack = None
-playingtrack = False
+is_playing = False
 runningTask = None
 
 # region bot.commands
@@ -42,7 +41,7 @@ async def play(ctx, url=None):
     global currentVoiceChannel
     global guildTextChannel
     global currentTrack
-    global playingtrack
+    global is_playing
 
     if currentTrack:
         history.append(currentTrack)
@@ -170,10 +169,15 @@ async def leave(ctx):
 @bot.command(name='stop', help='Stops the song')
 async def stop(ctx):
     voice_client = ctx.message.guild.voice_client
-    global playingtrack
+    global is_playing
+    global currentTrack
     if voice_client.is_playing():
         voice_client.stop()
-        playingtrack = False
+        is_playing = False
+        history.append(currentTrack)
+        currentTrack = None
+        runningTask.cancel()
+
     else:
         await ctx.send("The bot is not playing anything at the moment.")
 
@@ -220,7 +224,7 @@ def get_or_create_event_loop():
 
 async def download_song_data(url):
     global currentTrack
-    global playingtrack
+    global is_playing
     data = await YTDLSource.from_url(url, loops=get_or_create_event_loop())
     if type(data) is list:  # If playlist
         await add_songs_to_song_queue(data)
@@ -231,16 +235,16 @@ async def download_song_data(url):
 
 
 async def play_song(song):
-    global currentTrack, playingtrack, runningTask, currentVoiceClient
+    global currentTrack, is_playing, runningTask, currentVoiceClient
     file_name = song['artist'] + ' - ' + song['title']
     duration = song['duration']
     currentTrack = Track(file_name, song['webpage_url'])
     audio_stream = discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=song['url'], options='-vn',
                                           before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5")
-    if playingtrack:
+    if is_playing:
         currentVoiceClient.stop()
     print('Song Duration: ', duration)
-    playingtrack = True
+    is_playing = True
     await guildTextChannel.send('Playing **' + file_name + '**')
     currentVoiceClient.play(audio_stream, after=lambda e: print('Player error: %s' % e) if e else None)
     if runningTask:
