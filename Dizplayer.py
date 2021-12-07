@@ -197,7 +197,7 @@ async def on_ready():
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    if member.name == "DrDreBot":
+    if member.name == "Dizplayer":
         if before.channel is None and after.channel is not None:
             for channel in member.guild.text_channels:
                 if str(channel) == "bot-control":
