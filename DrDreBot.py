@@ -32,9 +32,6 @@ currentTrack = None
 playingtrack = False
 runningTask = None
 
-if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
-
 # region bot.commands
 
 
@@ -269,3 +266,7 @@ async def add_songs_to_song_queue(data):
     for song in data[1:]:
         song_queue.appendleft(Track(song['artist'] + ' - ' + song['title'], song['webpage_url']))
         # await queue(ctx)
+
+
+if __name__ == "__main__":
+    bot.run(DISCORD_TOKEN)
