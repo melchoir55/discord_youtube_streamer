@@ -96,16 +96,18 @@ async def add_song(ctx, url):
 @bot.command(name='queue', help='Prints queue and previous songs')
 async def queue(ctx):
     s = ""
-    if currentTrack:
-        s += "Playing : **" + currentTrack.filename + "** \n"
-    s += "-------------In Queue-------------\n"
-    # Reversed for songs to upper in order: next song on toppy
-    for track in reversed(song_queue):
-        s += track.filename + "\n"
     s += "-------------Previous-------------\n"
     if len(history) > 0:
         for track in history:
             s += track.filename + "\n"
+    if currentTrack:
+        s+= "--------------Playing-------------\n"
+        s += "**" + currentTrack.filename + "** \n"
+    s += "-------------In Queue-------------\n"
+    # Reversed for songs to upper in order: next song on toppy
+    for track in reversed(song_queue):
+        s += track.filename + "\n"
+
     await ctx.send(s)
 
 
@@ -118,7 +120,7 @@ async def next_song(ctx):
 async def prev(ctx):
     global song_queue
     track = history.pop()
-    song_queue.appendleft(track)
+    song_queue.append(currentTrack)
     await download_song_data(track.url)
 
 
