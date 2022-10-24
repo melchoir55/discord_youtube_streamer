@@ -5,6 +5,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from Music import Music
+from Listener import ListenerCog
 
 load_dotenv()
 # Get the API token from the .env file.
@@ -19,4 +20,5 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 if __name__ == "__main__":
     bot.add_cog(Music(bot))
+    bot.add_cog(ListenerCog(bot))
     bot.run(DISCORD_TOKEN)
