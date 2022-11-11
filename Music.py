@@ -105,7 +105,7 @@ class MusicPlayer:
     When the bot disconnects from the Voice it's instance will be destroyed.
     """
 
-    __slots__ = ('bot', '_guild', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume', 'ctx')
+    __slots__ = ('bot', '_guild', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume', 'ctx', 'repeat', 'current_source')
 
     def __init__(self, ctx):
         self.bot = ctx.bot
@@ -120,6 +120,8 @@ class MusicPlayer:
         self.volume = .5
         self.current = None
         self.ctx = ctx
+        self.repeat = False
+        self.current_source = None
 
         ctx.bot.loop.create_task(self.player_loop())
 
@@ -136,29 +138,32 @@ class MusicPlayer:
                     source = await self.queue.get()
             except asyncio.TimeoutError:
                 return self.destroy(self._guild)
-
+            self.current_source = source
             if not isinstance(source, YTDLSource):
                 # Source was probably a stream (not downloaded)
                 # So we should regather to prevent stream expiration
                 try:
-                    source = await YTDLSource.regather_stream(source, loop=self.bot.loop)
+                    gathered_source = await YTDLSource.regather_stream(source, loop=self.bot.loop)
                 except Exception as e:
                     await self.ctx.send(f'There was an error processing your song.\n'
                                              f'```css\n[{e}]\n```')
                     continue
 
-            source.volume = self.volume
-            self.current = source
-
-            self._guild.voice_client.play(source, after=lambda _: self.bot.loop.call_soon_threadsafe(self.next.set))
+            gathered_source.volume = self.volume
+            self.current = gathered_source
+            if self.repeat:
+                # new_source = await YTDLSource.create_source(self.ctx, source['search'], loop=self.bot.loop, download=False)
+                # new_source.search = search
+                self.queue._queue.appendleft(source)
+            self._guild.voice_client.play(gathered_source, after=lambda _: self.bot.loop.call_soon_threadsafe(self.next.set))
             embed = discord.Embed(title="Now playing",
-                                  description=f"[{source.title}]({source.web_url}) [{source.requester.mention}]",
+                                  description=f"[{gathered_source.title}]({gathered_source.web_url}) [{gathered_source.requester.mention}]",
                                   color=discord.Color.green())
             self.np = await self.ctx.send(embed=embed)
             await self.next.wait()
 
             # Make sure the FFmpeg process is cleaned up.
-            source.cleanup()
+            gathered_source.cleanup()
             self.current = None
 
     def destroy(self, guild):
@@ -282,6 +287,18 @@ class Music(commands.Cog):
         source = await YTDLSource.create_source(ctx, search, loop=self.bot.loop, download=False)
 
         await player.queue.put(source)
+
+    @commands.command(name='repeat', description="repeats song until called again")
+    async def repeat_(self, ctx):
+        """Repeat the currently paused song."""
+        player = await self.get_player(ctx)
+        player.repeat = not player.repeat
+        if not player.repeat:
+            player.queue._queue.popleft()
+        if player.repeat:
+            player.queue._queue.appendleft(player.current_source)
+
+        await ctx.send(f"Repeat 🔁️ toggled to {player.repeat}")
 
     @commands.command(name='pause', description="pauses music")
     async def pause_(self, ctx):
