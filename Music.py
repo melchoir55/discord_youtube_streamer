@@ -206,14 +206,18 @@ class Music(commands.Cog):
         print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)
         traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
 
-    def get_player(self, ctx):
+    async def get_player(self, ctx):
         """Retrieve the guild player, or generate one."""
         try:
             player = self.players[ctx.guild.id]
         except KeyError:
             player = MusicPlayer(ctx)
             self.players[ctx.guild.id] = player
-
+            default_volume_percentage = 3
+            player.volume = default_volume_percentage / 100
+            embed = discord.Embed(title="", description=f'**Player Spun Up** setting the default volume to **{default_volume_percentage}%**',
+                                  color=discord.Color.green())
+            await ctx.send(embed=embed)
         return player
 
     @commands.command(name='join', aliases=['connect', 'j'], description="connects to voice")
@@ -271,7 +275,7 @@ class Music(commands.Cog):
         if not vc:
             await ctx.invoke(self.connect_)
 
-        player = self.get_player(ctx)
+        player = await self.get_player(ctx)
 
         # If download is False, source will be a dict which will be used later to regather the stream.
         # If download is True, source will be a discord.FFmpegPCMAudio with a VolumeTransformer.
@@ -337,7 +341,7 @@ class Music(commands.Cog):
                                   color=discord.Color.green())
             return await ctx.send(embed=embed)
 
-        player = self.get_player(ctx)
+        player = await self.get_player(ctx)
         if pos == None:
             player.queue._queue.pop()
         else:
@@ -364,7 +368,7 @@ class Music(commands.Cog):
                                   color=discord.Color.green())
             return await ctx.send(embed=embed)
 
-        player = self.get_player(ctx)
+        player = await self.get_player(ctx)
         player.queue._queue.clear()
         await ctx.send('**Cleared**')
 
@@ -378,7 +382,7 @@ class Music(commands.Cog):
                                   color=discord.Color.green())
             return await ctx.send(embed=embed)
 
-        player = self.get_player(ctx)
+        player = await self.get_player(ctx)
         if player.queue.empty():
             embed = discord.Embed(title="", description="queue is empty", color=discord.Color.green())
             return await ctx.send(embed=embed)
@@ -415,7 +419,7 @@ class Music(commands.Cog):
                                   color=discord.Color.green())
             return await ctx.send(embed=embed)
 
-        player = self.get_player(ctx)
+        player = await self.get_player(ctx)
         if not player.current:
             embed = discord.Embed(title="", description="I am currently not playing anything",
                                   color=discord.Color.green())
@@ -462,7 +466,7 @@ class Music(commands.Cog):
                                   color=discord.Color.green())
             return await ctx.send(embed=embed)
 
-        player = self.get_player(ctx)
+        player = await self.get_player(ctx)
 
         if vc.source:
             vc.source.volume = vol / 100
