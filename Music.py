@@ -222,6 +222,7 @@ class Music(commands.Cog):
             if not this_guild:
                 inserted = guilds.insert_one({
                     "guild_id": ctx.guild.id,
+                    "name": ctx.guild.name,
                     "volume": 5
                 })
                 this_guild = guilds.find_one({"guild_id": ctx.guild.id})
