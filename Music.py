@@ -216,9 +216,19 @@ class Music(commands.Cog):
         try:
             player = self.players[ctx.guild.id]
         except KeyError:
+            guilds = self.bot.mongo_db.guilds
+            this_guild = guilds.find_one({"guild_id": ctx.guild.id})
+
+            if not this_guild:
+                inserted = guilds.insert_one({
+                    "guild_id": ctx.guild.id,
+                    "volume": 5
+                })
+                this_guild = guilds.find_one({"guild_id": ctx.guild.id})
+
             player = MusicPlayer(ctx)
             self.players[ctx.guild.id] = player
-            default_volume_percentage = 3
+            default_volume_percentage = this_guild['volume']
             player.volume = default_volume_percentage / 100
             embed = discord.Embed(title="", description=f'**Player Spun Up** setting the default volume to **{default_volume_percentage}%**',
                                   color=discord.Color.green())
@@ -491,6 +501,13 @@ class Music(commands.Cog):
         player.volume = vol / 100
         embed = discord.Embed(title="", description=f'**`{ctx.author}`** set the volume to **{vol}%**',
                               color=discord.Color.green())
+
+        #store new volume on guild in mongo
+        query = {"guild_id": ctx.guild.id}
+        new_value = {"$set": {"volume": vol}}
+        guilds = self.bot.mongo_db.guilds
+        guilds.update_one(query, new_value)
+
         await ctx.send(embed=embed)
 
     @commands.command(name='leave', aliases=["stop", "dc", "disconnect", "bye"],

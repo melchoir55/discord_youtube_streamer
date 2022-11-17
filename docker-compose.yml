@@ -6,3 +6,11 @@ services:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       PYTHONPATH: "."
     command: python3 Dizplayer.py
+  mongodb:
+    image: mongo:6.0.3
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+volumes:
+  mongo_data:
