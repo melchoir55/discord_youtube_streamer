@@ -43,6 +43,10 @@ class InvalidVoiceChannel(VoiceConnectionError):
     """Exception for cases of invalid Voice Channels."""
 
 
+class GuildNotAuthorized(VoiceConnectionError):
+    """This guild is not authorized to use the bot"""
+
+
 class YTDLSource(discord.PCMVolumeTransformer):
 
     def __init__(self, source, *, data, requester):
@@ -219,13 +223,12 @@ class Music(commands.Cog):
             guilds = self.bot.mongo_db.guilds
             this_guild = guilds.find_one({"guild_id": ctx.guild.id})
 
-            if not this_guild:
-                inserted = guilds.insert_one({
-                    "guild_id": ctx.guild.id,
-                    "name": ctx.guild.name,
-                    "volume": 5
-                })
-                this_guild = guilds.find_one({"guild_id": ctx.guild.id})
+            if not this_guild or not this_guild['authorized']:
+                embed = discord.Embed(title="Error",
+                                      description=f'{ctx.guild.name} ({ctx.guild.id}) has not been authorized to use the streamer. Please request authorization.',                                      color=discord.Color.green())
+                await ctx.send(embed=embed)
+                raise GuildNotAuthorized(
+                    f'{ctx.guild.name} ({ctx.guild.id}) has not been authorized to use the streamer. Please request authorization.')
 
             player = MusicPlayer(ctx)
             self.players[ctx.guild.id] = player
