@@ -10,10 +10,9 @@ import datetime
 
 load_dotenv()
 # Get the API token from the .env file.
+BOT_OWNER_USER_NAME = os.getenv("BOT_OWNER_USER_NAME")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI")
-BOT_OWNER_USER_NAME = os.getenv("BOT_OWNER_USER_NAME")
-print(DISCORD_TOKEN)
 
 initial_extensions = ['cogs.listener',
                       'cogs.music']

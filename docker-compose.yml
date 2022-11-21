@@ -4,6 +4,7 @@ services:
     build: .
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
+      BOT_OWNER_USER_NAME: ${BOT_OWNER_USER_NAME}
       PYTHONPATH: "."
     command: python3 Dizplayer.py
   mongodb:
