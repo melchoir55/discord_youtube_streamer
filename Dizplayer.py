@@ -3,10 +3,11 @@ import os
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-from Music import Music
 from Listener import ListenerCog
 import pymongo
 import datetime
+
+from Music import Music
 
 load_dotenv()
 # Get the API token from the .env file.
@@ -22,6 +23,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 mongo_client = pymongo.MongoClient(MONGO_URI)
 bot.mongo_db = mongo_client.youtube_streamer
+
 
 @bot.event
 async def on_guild_join(guild):
