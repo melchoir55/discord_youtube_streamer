@@ -10,6 +10,7 @@ from async_timeout import timeout
 from functools import partial
 import youtube_dl
 from youtube_dl import YoutubeDL
+
 from decorators import copy_doc
 
 
@@ -295,7 +296,12 @@ class Music(commands.Cog):
 
     async def join_slash(self,
                          ctx: commands.Context,
-                         channel: discord.VoiceChannel = None):
+                         channel: Option(discord.VoiceChannel,
+                                        description="The channel to connect to. By default, the bot will attempt to join your current voice channel.",
+                                        required=False,
+                                        default=None)):
+        """Connect the bot to a voice channel"""
+        await ctx.respond(f'Request to join {channel} received. Processing...', ephemeral=True)
         await self.connect_(ctx, channel=channel)
 
     @commands.command(name='play', aliases=['sing', 'p'], description="streams music")
@@ -323,12 +329,13 @@ class Music(commands.Cog):
         await player.queue.put(source)
 
     async def play_slash(self,
-                         ctx,
+                         ctx: commands.Context,
                          *,
-                         search=Option(str,
-                                        description="The song to search and retrieve using YTDL. This could be a simple search, an ID or URL.",
+                         search: Option(str,
+                                        description="The song to search and retrieve. This could be a simple search, an ID or URL.",
                                         required=True)):
         """Request a song and add it to the queue."""
+        await ctx.respond(f'Request to play {search} received. Processing...', ephemeral=True)
         await self.play_(ctx, search=search)
 
     @commands.command(name='repeat', description="repeats song until called again")
@@ -344,6 +351,8 @@ class Music(commands.Cog):
         await ctx.send(f"Repeat 🔁️ toggled to {player.repeat}")
 
     async def repeat_slash(self, ctx):
+        """Repeat the current song until 'repeat' called again."""
+        await ctx.respond(f'Toggling repeat...', ephemeral=True)
         await self.repeat_(ctx)
 
     @commands.command(name='pause', description="pauses music")
@@ -362,6 +371,8 @@ class Music(commands.Cog):
         await ctx.send("Paused ⏸️")
 
     async def pause_slash(self, ctx):
+        """Pause the currently playing song."""
+        await ctx.respond(f'Pausing...', ephemeral=True)
         await self.pause_(ctx)
 
     @commands.command(name='resume', description="resumes music")
@@ -380,6 +391,8 @@ class Music(commands.Cog):
         await ctx.send("Resuming ⏯️")
 
     async def resume_slash(self, ctx):
+        """Resume the currently paused song."""
+        await ctx.respond(f'Attempting to resume...', ephemeral=True)
         await self.resume_(ctx)
 
     @commands.command(name='skip', description="skips to next song in queue")
@@ -400,6 +413,8 @@ class Music(commands.Cog):
         vc.stop()
 
     async def skip_slash(self, ctx):
+        """Skip the song."""
+        await ctx.respond(f'Attempting to skip...', ephemeral=True)
         await self.skip_(ctx)
 
     @commands.command(name='remove', aliases=['rm', 'rem'], description="removes specified song from queue")
@@ -429,7 +444,11 @@ class Music(commands.Cog):
                                       color=discord.Color.green())
                 await ctx.send(embed=embed)
 
-    async def remove_slash(self, ctx, pos: int = None):
+    async def remove_slash(self, ctx, pos: Option(int,
+                                        description="The position of the song in the queue to remove.",
+                                        required=True)):
+        """Removes specified song from queue"""
+        await ctx.respond(f'Attempting to remove song at position {pos}...', ephemeral=True)
         await self.remove_(ctx, pos=pos)
 
     @commands.command(name='clear', aliases=['clr', 'cl', 'cr'], description="clears entire queue")
@@ -448,6 +467,8 @@ class Music(commands.Cog):
         await ctx.send('**Cleared**')
 
     async def clear_slash(self, ctx):
+        """Empties the queue."""
+        await ctx.respond(f'Attempting to clear the queue...', ephemeral=True)
         await self.clear_(ctx)
 
     @commands.command(name='queue', aliases=['q', 'playlist', 'que'], description="shows the queue")
@@ -487,6 +508,8 @@ class Music(commands.Cog):
         await ctx.send(embed=embed)
 
     async def queue_slash(self, ctx):
+        """Describes the queue of upcoming songs."""
+        await ctx.respond(f'Attempting to describe the queue...', ephemeral=True)
         await self.queue_info(ctx)
 
     @commands.command(name='np', aliases=['song', 'current', 'currentsong', 'playing'],
@@ -523,6 +546,8 @@ class Music(commands.Cog):
         await ctx.send(embed=embed)
 
     async def now_playing_slash(self, ctx):
+        """Display information about the currently playing song."""
+        await ctx.respond(f'Attempting to report now playing...', ephemeral=True)
         await self.now_playing_(ctx)
 
     @commands.command(name='volume', aliases=['vol', 'v'], description="changes Kermit's volume")
@@ -567,7 +592,13 @@ class Music(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    async def volume_slash(self, ctx, vol: float = None):
+    async def volume_slash(self, ctx, *, vol: Option(float,
+                                        description="Volume level. Default is 5.",
+                                        required=True,
+                                        min_value=0,
+                                        max_value=100)):
+        """Change the player volume. A little goes a long way."""
+        await ctx.respond(f'Attempting to change volume to {vol}...', ephemeral=True)
         await self.change_volume(ctx, vol)
 
     @commands.command(name='leave', aliases=["stop", "dc", "disconnect", "bye"],
@@ -584,11 +615,12 @@ class Music(commands.Cog):
                                   color=discord.Color.green())
             return await ctx.send(embed=embed)
 
-        if (random.randint(0, 1) == 0):
-            await ctx.message.add_reaction('👋')
         await ctx.send('**Successfully disconnected**')
 
         await self.cleanup(ctx.guild)
 
     async def leave_slash(self, ctx):
+        """Stop the currently playing song and destroy the player."""
+        await ctx.respond(f'Attempting to destroy the player...', ephemeral=True)
         await self.leave_(ctx)
+
