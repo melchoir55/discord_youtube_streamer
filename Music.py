@@ -1,4 +1,5 @@
 import discord
+from discord import Option
 from discord.ext import commands
 import random
 import asyncio
@@ -9,6 +10,8 @@ from async_timeout import timeout
 from functools import partial
 import youtube_dl
 from youtube_dl import YoutubeDL
+from decorators import copy_doc
+
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
@@ -183,6 +186,20 @@ class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.players = {}
+        self.bot.application_command(name="join", cls=discord.SlashCommand)(self.join_slash)
+        self.bot.application_command(name="play", cls=discord.SlashCommand)(self.play_slash)
+        self.bot.application_command(name="pause", cls=discord.SlashCommand)(self.pause_slash)
+        self.bot.application_command(name="resume", cls=discord.SlashCommand)(self.resume_slash)
+        self.bot.application_command(name="skip", cls=discord.SlashCommand)(self.skip_slash)
+        self.bot.application_command(name="volume", cls=discord.SlashCommand)(self.volume_slash)
+        self.bot.application_command(name="queue", cls=discord.SlashCommand)(self.queue_slash)
+        self.bot.application_command(name="now_playing", cls=discord.SlashCommand)(self.now_playing_slash)
+        self.bot.application_command(name="repeat", cls=discord.SlashCommand)(self.repeat_slash)
+        self.bot.application_command(name="remove", cls=discord.SlashCommand)(self.remove_slash)
+        self.bot.application_command(name="clear", cls=discord.SlashCommand)(self.clear_slash)
+        self.bot.application_command(name="leave", cls=discord.SlashCommand)(self.leave_slash)
+
+
 
     async def cleanup(self, guild):
         try:
@@ -273,19 +290,22 @@ class Music(commands.Cog):
                 await channel.connect()
             except asyncio.TimeoutError:
                 raise VoiceConnectionError(f'Connecting to channel: <{channel}> timed out.')
-        if (random.randint(0, 1) == 0):
-            await ctx.message.add_reaction('👍')
+
         await ctx.send(f'**Joined `{channel}`**')
+
+    async def join_slash(self,
+                         ctx: commands.Context,
+                         channel: discord.VoiceChannel = None):
+        await self.connect_(ctx, channel=channel)
 
     @commands.command(name='play', aliases=['sing', 'p'], description="streams music")
     async def play_(self, ctx, *, search: str):
         """Request a song and add it to the queue.
         This command attempts to join a valid voice channel if the bot is not already in one.
         Uses YTDL to automatically search and retrieve a song.
-        Parameters
-        ------------
-        search: str [Required]
-            The song to search and retrieve using YTDL. This could be a simple search, an ID or URL.
+
+        Args:
+        search (str): The song to search and retrieve using YTDL. This could be a simple search, an ID or URL.
         """
         await ctx.trigger_typing()
 
@@ -302,6 +322,15 @@ class Music(commands.Cog):
 
         await player.queue.put(source)
 
+    async def play_slash(self,
+                         ctx,
+                         *,
+                         search=Option(str,
+                                        description="The song to search and retrieve using YTDL. This could be a simple search, an ID or URL.",
+                                        required=True)):
+        """Request a song and add it to the queue."""
+        await self.play_(ctx, search=search)
+
     @commands.command(name='repeat', description="repeats song until called again")
     async def repeat_(self, ctx):
         """Repeat the currently paused song."""
@@ -313,6 +342,9 @@ class Music(commands.Cog):
             player.queue._queue.appendleft(player.current_source)
 
         await ctx.send(f"Repeat 🔁️ toggled to {player.repeat}")
+
+    async def repeat_slash(self, ctx):
+        await self.repeat_(ctx)
 
     @commands.command(name='pause', description="pauses music")
     async def pause_(self, ctx):
@@ -329,6 +361,9 @@ class Music(commands.Cog):
         vc.pause()
         await ctx.send("Paused ⏸️")
 
+    async def pause_slash(self, ctx):
+        await self.pause_(ctx)
+
     @commands.command(name='resume', description="resumes music")
     async def resume_(self, ctx):
         """Resume the currently paused song."""
@@ -343,6 +378,9 @@ class Music(commands.Cog):
 
         vc.resume()
         await ctx.send("Resuming ⏯️")
+
+    async def resume_slash(self, ctx):
+        await self.resume_(ctx)
 
     @commands.command(name='skip', description="skips to next song in queue")
     async def skip_(self, ctx):
@@ -360,6 +398,9 @@ class Music(commands.Cog):
             return
 
         vc.stop()
+
+    async def skip_slash(self, ctx):
+        await self.skip_(ctx)
 
     @commands.command(name='remove', aliases=['rm', 'rem'], description="removes specified song from queue")
     async def remove_(self, ctx, pos: int = None):
@@ -388,6 +429,9 @@ class Music(commands.Cog):
                                       color=discord.Color.green())
                 await ctx.send(embed=embed)
 
+    async def remove_slash(self, ctx, pos: int = None):
+        await self.remove_(ctx, pos=pos)
+
     @commands.command(name='clear', aliases=['clr', 'cl', 'cr'], description="clears entire queue")
     async def clear_(self, ctx):
         """Deletes entire queue of upcoming songs."""
@@ -402,6 +446,9 @@ class Music(commands.Cog):
         player = await self.get_player(ctx)
         player.queue._queue.clear()
         await ctx.send('**Cleared**')
+
+    async def clear_slash(self, ctx):
+        await self.clear_(ctx)
 
     @commands.command(name='queue', aliases=['q', 'playlist', 'que'], description="shows the queue")
     async def queue_info(self, ctx):
@@ -439,6 +486,9 @@ class Music(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    async def queue_slash(self, ctx):
+        await self.queue_info(ctx)
+
     @commands.command(name='np', aliases=['song', 'current', 'currentsong', 'playing'],
                       description="shows the current playing song")
     async def now_playing_(self, ctx):
@@ -471,6 +521,9 @@ class Music(commands.Cog):
                               color=discord.Color.green())
         embed.set_author(icon_url=self.bot.user.avatar_url, name=f"Now Playing 🎶")
         await ctx.send(embed=embed)
+
+    async def now_playing_slash(self, ctx):
+        await self.now_playing_(ctx)
 
     @commands.command(name='volume', aliases=['vol', 'v'], description="changes Kermit's volume")
     async def change_volume(self, ctx, *, vol: float = None):
@@ -514,6 +567,9 @@ class Music(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    async def volume_slash(self, ctx, vol: float = None):
+        await self.change_volume(ctx, vol)
+
     @commands.command(name='leave', aliases=["stop", "dc", "disconnect", "bye"],
                       description="stops music and disconnects from voice")
     async def leave_(self, ctx):
@@ -533,3 +589,6 @@ class Music(commands.Cog):
         await ctx.send('**Successfully disconnected**')
 
         await self.cleanup(ctx.guild)
+
+    async def leave_slash(self, ctx):
+        await self.leave_(ctx)
