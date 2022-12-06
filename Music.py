@@ -503,7 +503,7 @@ class Music(commands.Cog):
             for _ in upcoming)
         fmt = f"\n__Now Playing__:\n[{vc.source.title}]({vc.source.web_url}) | ` {duration} Requested by: {vc.source.requester}`\n\n__Up Next:__\n" + fmt + f"\n**{len(upcoming)} songs in queue**"
         embed = discord.Embed(title=f'Queue for {ctx.guild.name}', description=fmt, color=discord.Color.green())
-        embed.set_footer(text=f"{ctx.author.display_name}", icon_url=ctx.author.avatar_url)
+        embed.set_footer(text=f"{ctx.author.display_name}", icon_url=ctx.author.avatar.url)
 
         await ctx.send(embed=embed)
 
@@ -542,7 +542,7 @@ class Music(commands.Cog):
         embed = discord.Embed(title="",
                               description=f"[{vc.source.title}]({vc.source.web_url}) [{vc.source.requester.mention}] | `{duration}`",
                               color=discord.Color.green())
-        embed.set_author(icon_url=self.bot.user.avatar_url, name=f"Now Playing 🎶")
+        embed.set_author(icon_url=self.bot.user.display_avatar.url, name=f"Now Playing 🎶")
         await ctx.send(embed=embed)
 
     async def now_playing_slash(self, ctx):
