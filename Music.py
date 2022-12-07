@@ -115,11 +115,11 @@ class MusicPlayer:
 
     __slots__ = ('bot', '_guild', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume', 'ctx', 'repeat', 'current_source')
 
-    def __init__(self, ctx):
+    def __init__(self, ctx, parent_cog):
         self.bot = ctx.bot
         self._guild = ctx.guild
         self._channel = ctx.channel
-        self._cog = ctx.cog
+        self._cog = parent_cog
 
         self.queue = asyncio.Queue()
         self.next = asyncio.Event()
@@ -248,7 +248,7 @@ class Music(commands.Cog):
                 raise GuildNotAuthorized(
                     f'{ctx.guild.name} ({ctx.guild.id}) has not been authorized to use the streamer. Please request authorization.')
 
-            player = MusicPlayer(ctx)
+            player = MusicPlayer(ctx, self)
             self.players[ctx.guild.id] = player
             default_volume_percentage = this_guild['volume']
             player.volume = default_volume_percentage / 100
