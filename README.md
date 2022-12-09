@@ -1,3 +1,8 @@
+# Warning
+
+This bot exists for educational purposes only. 
+The author does not accept liability for any damages suffered from its use.
+
 # Run
 
 Install docker. Then run:
