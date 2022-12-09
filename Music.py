@@ -10,7 +10,7 @@ from async_timeout import timeout
 from functools import partial
 import youtube_dl
 from youtube_dl import YoutubeDL
-
+import datetime
 from decorators import copy_doc
 
 
@@ -176,6 +176,7 @@ class MusicPlayer:
 
     def destroy(self, guild):
         """Disconnect and cleanup the player."""
+        print(f'executing destroy{datetime.datetime.now()}')
         return self.bot.loop.create_task(self._cog.cleanup(guild))
 
 
