@@ -3,11 +3,11 @@ import os
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-from Listener import ListenerCog
+from app.listener import ListenerCog
 import pymongo
 import datetime
 
-from Music import Music
+from app.music import Music
 
 load_dotenv()
 # Get the API token from the .env file.

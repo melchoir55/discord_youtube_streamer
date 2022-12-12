@@ -1,7 +1,8 @@
 # Warning
 
 This bot exists for educational purposes only. 
-The author does not accept liability for any damages suffered from its use.
+The author does not accept liability for any damages suffered from its use. 
+Ensure that you are not violating the TOS of any service you interact with using this bot.
 
 # Run
 

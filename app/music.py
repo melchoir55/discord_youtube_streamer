@@ -1,7 +1,6 @@
 import discord
 from discord import Option
 from discord.ext import commands
-import random
 import asyncio
 import itertools
 import sys
@@ -11,8 +10,6 @@ from functools import partial
 import youtube_dl
 from youtube_dl import YoutubeDL
 import datetime
-from decorators import copy_doc
-
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
