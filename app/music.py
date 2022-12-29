@@ -597,7 +597,7 @@ class Music(commands.Cog):
                                         max_value=100)):
         """Change the player volume. A little goes a long way."""
         await ctx.respond(f'Attempting to change volume to {vol}...', ephemeral=True)
-        await self.change_volume(ctx, vol)
+        await self.change_volume(ctx, vol=vol)
 
     @commands.command(name='leave', aliases=["stop", "dc", "disconnect", "bye"],
                       description="stops music and disconnects from voice")
