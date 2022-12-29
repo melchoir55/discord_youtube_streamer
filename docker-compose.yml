@@ -2,6 +2,7 @@ version: "3.9"
 services:
   bot:
     build: .
+    pull_policy: build
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       BOT_OWNER_USER_NAME: ${BOT_OWNER_USER_NAME}
